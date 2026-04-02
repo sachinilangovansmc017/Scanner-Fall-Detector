@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>TC27 Fall Detector · Offline Ready</title>
+  <!-- PWA manifest embedded as data URI (no external file needed) -->
+  <link rel="manifest" href="data:application/manifest+json,{%22name%22:%22TC27%20Fall%20Detector%22,%22short_name%22:%22FallDetect%22,%22start_url%22:%22.%22,%22display%22:%22standalone%22,%22theme_color%22:%22%23101820%22,%22background_color%22:%22%23101820%22}">
+  <style>
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+    body {
+      background: #101820;
+      font-family: 'Segoe UI', 'Roboto', system-ui, sans-serif;
+      margin: 0;
+      padding: 16px;
+      color: #e0f2fe;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    h1 {
+      font-size: 1.8rem;
+      text-align: center;
+      margin: 0 0 4px;
+      letter-spacing: 1px;
+      font-weight: 600;
+      color: #7dd3fc;
+    }
+    .badge {
+      text-align: center;
+      font-size: 0.75rem;
+      opacity: 0.8;
+      margin-bottom: 20px;
+      border-bottom: 1px solid #2c5a6e;
+      display: inline-block;
+      width: auto;
+      padding-bottom: 6px;
+    }
+    .btn-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      justify-content: center;
+      margin: 20px 0;
+    }
+    button {
+      background: #1e2a3a;
+      border: 2px solid #38bdf8;
+      color: #38bdf8;
+      font-size: 1.2rem;
+      font-weight: bold;
+      padding: 14px 24px;
+      border-radius: 48px;
+      font-family: inherit;
+      cursor: pointer;
+      transition: 0.1s linear;
+      min-width: 140px;
+      touch-action: manipulation;
+    }
+    button.primary {
+      background: #0284c7;
+      color: white;
+      border-color: #7dd3fc;
+      box-shadow: 0 0 8px #38bdf8;
+    }
+    button:active {
+      transform: scale(0.97);
+      background: #0f3b5c;
+    }
+    .status-panel {
+      background: #0a141fcc;
+      backdrop-filter: blur(8px);
+      border-radius: 32px;
+      padding: 16px;
+      margin: 16px 0;
+      border: 1px solid #38bdf8;
+    }
+    .grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      justify-content: space-between;
+    }
+    .card {
+      background: #0f212e;
+      border-radius: 24px;
+      padding: 12px 16px;
+      flex: 1;
+      min-width: 130px;
+      text-align: center;
+    }
+    .card .label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #9ec8e0;
+    }
+    .card .value {
+      font-size: 2rem;
+      font-weight: bold;
+      font-family: monospace;
+      line-height: 1.2;
+    }
+    .alert-area {
+      background: #07131c;
+      border-left: 6px solid #38bdf8;
+      border-radius: 28px;
+      padding: 14px 20px;
+      margin: 20px 0;
+      transition: all 0.2s;
+    }
+    .alert-fall {
+      border-left-color: #ef4444;
+      background: #2c0f0f;
+      animation: pulse 0.5s;
+    }
+    .alert-man {
+      border-left-color: #f97316;
+      background: #2a1f0c;
+    }
+    .log-box {
+      background: #030c14;
+      border-radius: 24px;
+      padding: 12px;
+      max-height: 240px;
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: 0.8rem;
+    }
+    .log-entry {
+      border-bottom: 0.5px solid #2c5a6e;
+      padding: 8px;
+      color: #b9e6ff;
+    }
+    @keyframes pulse {
+      0% { background: #2c0f0f; border-left-color: #ff8888; }
+    }
+    .footer {
+      font-size: 0.65rem;
+      text-align: center;
+      margin-top: 24px;
+      opacity: 0.6;
+    }
+    @media (max-width: 550px) {
+      button { padding: 12px 18px; font-size: 1rem; min-width: 120px; }
+      .card .value { font-size: 1.6rem; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>📡 TC27 FALL DETECTOR</h1>
+  <div style="text-align:center"><span class="badge">offline · impact + angle · man down</span></div>
+
+  <div class="btn-group">
+    <button id="enableBtn" class="primary">✅ ENABLE</button>
+    <button id="stopBtn">⏹️ STOP</button>
+    <button id="resetLogBtn">🗑️ CLEAR LOG</button>
+    <button id="calibrateBtn">🎯 CALIBRATE</button>
+  </div>
+
+  <div class="status-panel">
+    <div class="grid">
+      <div class="card"><div class="label">STATUS</div><div class="value" id="statusIcon">🟢 MON</div></div>
+      <div class="card"><div class="label">IMPACT (g)</div><div class="value" id="magVal">0.00</div></div>
+      <div class="card"><div class="label">PITCH / ROLL</div><div class="value" id="angleVal">0°/0°</div></div>
+      <div class="card"><div class="label">LAST EVENT</div><div class="value" id="lastEvent">—</div></div>
+    </div>
+  </div>
+
+  <div id="alertBox" class="alert-area">
+    🟢 SYSTEM READY — Press ENABLE and keep device on body.
+  </div>
+
+  <div class="log-box" id="logPanel">
+    <div class="log-entry">📱 TC27 Fall Detector loaded (offline ready)</div>
+    <div class="log-entry">⚙️ Tap ENABLE to start sensors</div>
+  </div>
+  <div class="footer">
+    ⚡ Fall: g > 2.5 + angle change >30° &nbsp;|&nbsp; MAN DOWN: tilt >45° for 2 sec
+  </div>
+</div>
+
+<script>
+  // ------------------- FALL DETECTION ENGINE ------------------
+  let sensorActive = false;
+  let currentMagnitude = 0;
+  let orientation = { pitch: 0, roll: 0 };
+  let refPitch = 0, refRoll = 0, calibrated = false;
+
+  const IMPACT_THRESH = 2.5;
+  const FALL_ANGLE_CHANGE = 30;
+  const MAN_DOWN_ANGLE = 45;
+  const MAN_DOWN_DURATION = 2000;
+
+  let lastImpactTime = 0;
+  let manDownTimer = null;
+  let manDownActive = false;
+  let fallActive = false;
+
+  // UI elements
+  const statusIcon = document.getElementById('statusIcon');
+  const magValSpan = document.getElementById('magVal');
+  const angleValSpan = document.getElementById('angleVal');
+  const lastEventSpan = document.getElementById('lastEvent');
+  const alertBox = document.getElementById('alertBox');
+  const logPanel = document.getElementById('logPanel');
+
+  function addLog(msg, type = 'info') {
+    const entry = document.createElement('div');
+    entry.className = 'log-entry';
+    const t = new Date().toLocaleTimeString();
+    entry.innerHTML = `[${t}] ${msg}`;
+    if (type === 'fall') entry.style.color = '#ff9f9f';
+    else if (type === 'man') entry.style.color = '#ffb347';
+    else entry.style.color = '#b0e0ff';
+    logPanel.prepend(entry);
+    while (logPanel.children.length > 40) logPanel.removeChild(logPanel.lastChild);
+  }
+
+  function setAlert(level, message) {
+    alertBox.innerHTML = `<strong>${level}</strong> — ${message}`;
+    alertBox.classList.remove('alert-fall', 'alert-man');
+    if (level.includes('FALL')) alertBox.classList.add('alert-fall');
+    else if (level.includes('MAN DOWN')) alertBox.classList.add('alert-man');
+    if (level.includes('FALL') || level.includes('MAN DOWN')) {
+      if (navigator.vibrate) navigator.vibrate(500);
+    }
+  }
+
+  function setStatus(iconText, fallFlag, manFlag) {
+    statusIcon.innerHTML = iconText;
+    if (fallFlag) fallActive = true;
+    else if (!manFlag) fallActive = false;
+    if (manFlag) manDownActive = true;
+    else if (!fallFlag) manDownActive = false;
+  }
+
+  function resetFallMan() {
+    if (fallActive) {
+      fallActive = false;
+      setStatus('🟢 MON', false, manDownActive);
+      if (!manDownActive) setAlert('🟢 MONITORING', 'No fall detected');
+      addLog('✅ All clear: back to monitoring');
+    }
+  }
+
+  function evaluateManDown(pitchDeg) {
+    const absTilt = Math.abs(pitchDeg);
+    if (absTilt > MAN_DOWN_ANGLE) {
+      if (!manDownTimer) {
+        manDownTimer = setTimeout(() => {
+          if (sensorActive && Math.abs(orientation.pitch) > MAN_DOWN_ANGLE) {
+            if (!manDownActive) {
+              manDownActive = true;
+              setStatus('🟠 MAN DOWN', false, true);
+              setAlert('⚠️ MAN DOWN (PROLONGED TILT)', `Person lying > ${MAN_DOWN_ANGLE}° for 2 sec`);
+              addLog(`🚨 MAN DOWN: sustained pitch ${absTilt.toFixed(1)}°`, 'man');
+              lastEventSpan.innerText = 'MAN DOWN';
+            }
+          }
+          manDownTimer = null;
+        }, MAN_DOWN_DURATION);
+      }
+    } else {
+      if (manDownTimer) { clearTimeout(manDownTimer); manDownTimer = null; }
+      if (manDownActive) {
+        manDownActive = false;
+        setStatus('🟢 MON', false, false);
+        setAlert('🟢 MONITORING', 'Person returned to normal posture');
+        addLog('↻ Man-down cleared – upright position');
+        lastEventSpan.innerText = '—';
+        if (!fallActive) lastEventSpan.innerText = '—';
+      }
+    }
+  }
+
+  function detectFall(magnitudeG, pitchDelta) {
+    const now = Date.now();
+    if (magnitudeG > IMPACT_THRESH && (now - lastImpactTime) > 800) {
+      lastImpactTime = now;
+      addLog(`⚡ IMPACT spike: ${magnitudeG.toFixed(2)}g`, 'fall');
+      setTimeout(() => {
+        if (!sensorActive) return;
+        const angleChange = Math.abs(pitchDelta);
+        if (angleChange > FALL_ANGLE_CHANGE && currentMagnitude < 1.3) {
+          if (!fallActive) {
+            fallActive = true;
+            setStatus('🔴 FALL DETECT', true, manDownActive);
+            setAlert('🚨 FALL EVENT', `Impact ${magnitudeG.toFixed(1)}g, angle shift ${angleChange.toFixed(1)}°`);
+            addLog(`🔴 FALL CONFIRMED! angle change ${angleChange.toFixed(1)}°`, 'fall');
+            lastEventSpan.innerText = 'FALL';
+            if (navigator.vibrate) navigator.vibrate([400,200,400]);
+            setTimeout(() => { if (fallActive && !manDownActive) resetFallMan(); }, 5000);
+          }
+        } else {
+          addLog(`⚠️ strong shake but angle change moderate (${angleChange.toFixed(1)}°)`, 'info');
+        }
+      }, 280);
+    }
+  }
+
+  // Sensor handlers
+  let motionHandler = null;
+  let orientationHandler = null;
+
+  function processMotion(event) {
+    if (!sensorActive) return;
+    const acc = event.accelerationIncludingGravity;
+    if (!acc) return;
+    let { x, y, z } = acc;
+    if (x === null || y === null || z === null) return;
+    let mag = Math.sqrt(x*x + y*y + z*z) / 9.8;
+    mag = Math.min(5.0, mag);
+    currentMagnitude = mag;
+    magValSpan.innerText = mag.toFixed(2) + " g";
+  }
+
+  function processOrientation(event) {
+    if (!sensorActive) return;
+    let beta = event.beta;
+    let gamma = event.gamma;
+    if (beta !== null && gamma !== null) {
+      if (!calibrated && sensorActive) {
+        refPitch = beta;
+        refRoll = gamma;
+        calibrated = true;
+        addLog(`🎯 Calibrated: reference pitch ${refPitch.toFixed(1)}°, roll ${refRoll.toFixed(1)}°`);
+      }
+      let pitchDeg = beta - refPitch;
+      let rollDeg = gamma - refRoll;
+      orientation.pitch = pitchDeg;
+      orientation.roll = rollDeg;
+      angleValSpan.innerText = `${pitchDeg.toFixed(1)}° / ${rollDeg.toFixed(1)}°`;
+      evaluateManDown(Math.abs(beta));
+      let pitchDelta = Math.abs(pitchDeg);
+      detectFall(currentMagnitude, pitchDelta);
+    }
+  }
+
+  function stopAllSensors() {
+    if (motionHandler) window.removeEventListener('devicemotion', motionHandler);
+    if (orientationHandler) window.removeEventListener('deviceorientation', orientationHandler);
+    sensorActive = false;
+    calibrated = false;
+    if (manDownTimer) clearTimeout(manDownTimer);
+    manDownTimer = null;
+    addLog("⏹️ Sensors stopped");
+    setStatus('⚫ OFF', false, false);
+    setAlert('⏸️ STOPPED', 'Press ENABLE to start fall detection');
+  }
+
+  function startSensors() {
+    if (sensorActive) return;
+    stopAllSensors();
+    sensorActive = true;
+    calibrated = false;
+    manDownActive = false;
+    fallActive = false;
+    lastImpactTime = 0;
+    setStatus('🟢 INIT', false, false);
+    setAlert('🟢 INITIALIZING', 'Move slightly to calibrate orientation');
+    addLog("▶️ Starting fall detection...");
+
+    motionHandler = (e) => processMotion(e);
+    orientationHandler = (e) => processOrientation(e);
+    window.addEventListener('devicemotion', motionHandler);
+    window.addEventListener('deviceorientation', orientationHandler);
+
+    setTimeout(() => {
+      if (sensorActive && !calibrated) {
+        addLog("⚠️ Orientation not ready – try moving device", "info");
+      }
+    }, 1500);
+  }
+
+  function requestSensors() {
+    if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+      DeviceMotionEvent.requestPermission()
+        .then(state => {
+          if (state === 'granted') {
+            if (typeof DeviceOrientationEvent !== 'undefined' && DeviceOrientationEvent.requestPermission)
+              DeviceOrientationEvent.requestPermission().catch(e=>console.log);
+            startSensors();
+          } else addLog("❌ Motion permission denied");
+        })
+        .catch(err => addLog("Permission error: "+err));
+    } else {
+      startSensors();
+      addLog("✅ Sensors enabled (standard API)");
+    }
+  }
+
+  // Wake Lock to keep screen on
+  let wakeLock = null;
+  async function requestWakeLock() {
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => addLog("Screen wake lock released"));
+      addLog("🔒 Screen wake lock active");
+    } catch (err) { console.log(err); }
+  }
+
+  // UI buttons
+  document.getElementById('enableBtn').onclick = () => {
+    requestSensors();
+    requestWakeLock();
+  };
+  document.getElementById('stopBtn').onclick = () => { stopAllSensors(); };
+  document.getElementById('resetLogBtn').onclick = () => {
+    while(logPanel.children.length > 1) logPanel.removeChild(logPanel.lastChild);
+    addLog("🗑️ Log cleared");
+  };
+  document.getElementById('calibrateBtn').onclick = () => {
+    if (!sensorActive) { addLog("Enable sensors first to calibrate"); return; }
+    calibrated = false;
+    addLog("🔄 Calibration reset – move device to set new reference");
+    setAlert("🔄 CALIBRATING", "Move device to new neutral position");
+  };
+
+  // ---------- PWA Service Worker registration (embedded) ----------
+  if ('serviceWorker' in navigator) {
+    // Create a Blob from inline SW code and register it
+    const swCode = `
+      self.addEventListener('install', event => {
+        event.waitUntil(
+          caches.open('fall-cache-v1').then(cache => {
+            return cache.addAll(['./']);
+          })
+        );
+      });
+      self.addEventListener('fetch', event => {
+        event.respondWith(
+          caches.match(event.request).then(response => {
+            return response || fetch(event.request);
+          })
+        );
+      });
+    `;
+    const blob = new Blob([swCode], {type: 'application/javascript'});
+    const swUrl = URL.createObjectURL(blob);
+    navigator.serviceWorker.register(swUrl).then(reg => {
+      console.log('SW registered');
+      addLog("📲 PWA service worker installed – offline ready");
+    }).catch(err => addLog("SW registration failed: " + err));
+  }
+
+  addLog("✅ Ready: copy file & open. Tap ENABLE.");
+</script>
+</body>
+</html>
